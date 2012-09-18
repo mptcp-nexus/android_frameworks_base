@@ -84,6 +84,7 @@ import com.google.android.collect.Lists;
 import com.google.android.collect.Sets;
 import dalvik.system.DexClassLoader;
 import java.io.FileDescriptor;
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Constructor;
@@ -169,6 +170,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     private Object mDnsLock = new Object();
     private int mNumDnsEntries;
     private boolean mDnsOverridden = false;
+
+    private boolean mMultipathCapable = false;
 
     private boolean mTestMode;
     private static ConnectivityService sServiceInstance;
@@ -355,6 +358,10 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         } catch (IllegalArgumentException e) {
             loge("Error setting defaultDns using " + dns);
         }
+
+	File mptcpFile = new File("/proc/net/mptcp_pm");
+	if (mptcpFile.exists())
+		mMultipathCapable = true;
 
         mContext = checkNotNull(context, "missing Context");
         mNetd = checkNotNull(netd, "missing INetworkManagementService");
@@ -1348,6 +1355,8 @@ private NetworkStateTracker makeWimaxStateTracker() {
 
     private boolean modifyRoute(String ifaceName, LinkProperties lp, RouteInfo r, int cycleCount,
             boolean doAdd, boolean toDefaultTable) {
+	if (mMultipathCapable)
+	    toDefaultTable = false;
         if ((ifaceName == null) || (lp == null) || (r == null)) {
             if (DBG) log("modifyRoute got unexpected null: " + ifaceName + ", " + lp + ", " + r);
             return false;
@@ -1867,7 +1876,7 @@ private NetworkStateTracker makeWimaxStateTracker() {
         // if this is a default net and other default is running
         // kill the one not preferred
         if (mNetConfigs[type].isDefault()) {
-            if (mActiveDefaultNetwork != -1 && mActiveDefaultNetwork != type) {
+            if (mActiveDefaultNetwork != -1 && mActiveDefaultNetwork != type && !mMultipathCapable) {
                 if ((type != mNetworkPreference &&
                         mNetConfigs[mActiveDefaultNetwork].priority >
                         mNetConfigs[type].priority) ||
