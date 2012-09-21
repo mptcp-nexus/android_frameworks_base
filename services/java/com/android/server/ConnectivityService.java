@@ -1355,8 +1355,6 @@ private NetworkStateTracker makeWimaxStateTracker() {
 
     private boolean modifyRoute(String ifaceName, LinkProperties lp, RouteInfo r, int cycleCount,
             boolean doAdd, boolean toDefaultTable) {
-	if (mMultipathCapable)
-	    toDefaultTable = false;
         if ((ifaceName == null) || (lp == null) || (r == null)) {
             if (DBG) log("modifyRoute got unexpected null: " + ifaceName + ", " + lp + ", " + r);
             return false;
@@ -1941,6 +1939,46 @@ private NetworkStateTracker makeWimaxStateTracker() {
     }
 
     /**
+     * When a change of connectivity occurs we need to ensure that:
+     *  - WiFi is always prefered as default route and DNS resolver;
+     *  - When WiFi is not available then a default route and DNS resolver
+     *    must exist if an other connectivity is available.
+     */
+    private void multipathConnectivityChange(int netType, boolean doReset) {
+        /* Always prefers going through WiFi when MPTCP capable */
+        if (mNetTrackers[ConnectivityManager.TYPE_WIFI] != null &&
+            mNetTrackers[ConnectivityManager.TYPE_WIFI].getNetworkInfo().isAvailable()) {
+            mCurrentLinkProperties[ConnectivityManager.TYPE_WIFI] = null;
+            for (NetworkConfig mNetConfig: mNetConfigs)
+                if (mNetConfig != null) {
+                    boolean isDefault = mNetConfig.isDefault();
+                    mNetConfig.setDefault(mNetConfig.type == ConnectivityManager.TYPE_WIFI);
+                    if (isDefault != mNetConfig.isDefault())
+                        mCurrentLinkProperties[mNetConfig.type] = null;
+                }
+        } else {
+            for (NetworkConfig mNetConfig: mNetConfigs)
+                if (mNetConfig != null) {
+                    boolean isDefault = mNetConfig.isDefault();
+                    mNetConfig.setDefault(mNetConfig.radio == mNetConfig.type);
+                    if (isDefault != mNetConfig.isDefault())
+                        mCurrentLinkProperties[mNetConfig.type] = null;
+                }
+        }
+
+        if (doReset) {
+            for (NetworkConfig mNetConfig: mNetConfigs)
+                if (mNetConfig != null &&
+                    mNetTrackers[mNetConfig.type].getNetworkInfo().isAvailable()) {
+                    handleConnectivityChange(mNetConfig.type, false);
+                    return true;
+                }
+        }
+
+        return false;
+    }
+
+    /**
      * After a change in the connectivity state of a network. We're mainly
      * concerned with making sure that the list of DNS servers is set up
      * according to which networks are connected, and ensuring that the
@@ -1948,6 +1986,10 @@ private NetworkStateTracker makeWimaxStateTracker() {
      */
     private void handleConnectivityChange(int netType, boolean doReset) {
         int resetMask = doReset ? NetworkUtils.RESET_ALL_ADDRESSES : 0;
+
+        if (mMultipathCapable)
+            if (multipathConnectivityChange(netType))
+                return;
 
         /*
          * If a non-default network is enabled, add the host routes that

@@ -57,6 +57,11 @@ public class NetworkConfig {
     public int restoreTime;
 
     /**
+     * indicates whether the connection can be used as default
+     */
+    private boolean isDefault = false;
+
+    /**
      * input string from config.xml resource.  Uses the form:
      * [Connection name],[ConnectivityManager connection type],
      * [associated radio-type],[priority],[dependencyMet]
@@ -75,6 +80,10 @@ public class NetworkConfig {
      * Indicates if this network is supposed to be default-routable
      */
     public boolean isDefault() {
-        return (type == radio);
+        return isDefault;
+    }
+
+    public void setDefault(boolean def) {
+        isDefault = def;
     }
 }
