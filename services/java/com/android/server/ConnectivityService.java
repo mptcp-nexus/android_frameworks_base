@@ -359,7 +359,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
             loge("Error setting defaultDns using " + dns);
         }
 
-	File mptcpFile = new File("/proc/net/mptcp_pm");
+	File mptcpFile = new File("/proc/net/mptcp");
 	if (mptcpFile.exists())
 		mMultipathCapable = true;
 
