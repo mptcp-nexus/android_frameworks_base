@@ -1,4 +1,4 @@
-android_frameworks_base
-=======================
+MPTCP enabled base framework
+============================
 
-Android base frameworks
+Enhanced base framework, so that 3G and WIFI can work simultaneously.
